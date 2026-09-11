@@ -3992,7 +3992,9 @@ three/build/three.module.js:
     "It's taken down and deleted. Nothing else is expected from you."
   ];
   var FINAL = "That's all this page is for.";
-  var LAST_STEP = PANELS.length; // the final line
+  var APOLOGY = "I'm sorry.";
+  var SAD = '\uD83D\uDE14'; // pensive face
+  var LAST_STEP = PANELS.length + 1; // the final line, then the apology
 
   // Texture canvas: portrait, paper proportions.
   var TW = 1024, TH = 1448;
@@ -4064,6 +4066,66 @@ three/build/three.module.js:
     return toTexture(c);
   }
 
+  // Colour emoji is missing on some systems and would render as a blank box,
+  // so check for it and fall back to drawing the face by hand.
+  function hasColourEmoji(ctx, ch) {
+    ctx.save();
+    ctx.clearRect(0, 0, 128, 128);
+    ctx.font = '96px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#000000';
+    ctx.fillText(ch, 64, 64);
+    var d = ctx.getImageData(0, 0, 128, 128).data;
+    var coloured = false;
+    for (var i = 0; i < d.length; i += 4) {
+      if (d[i + 3] < 40) continue;
+      var max = Math.max(d[i], d[i + 1], d[i + 2]);
+      var min = Math.min(d[i], d[i + 1], d[i + 2]);
+      if (max - min > 24) { coloured = true; break; }
+    }
+    ctx.restore();
+    ctx.clearRect(0, 0, 128, 128);
+    return coloured;
+  }
+
+  function drawSadFace(ctx, cx, cy, r, color) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(2, r * 0.09);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx - r * 0.36, cy - r * 0.18, r * 0.08, 0, Math.PI * 2);
+    ctx.arc(cx + r * 0.36, cy - r * 0.18, r * 0.08, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx, cy + r * 0.66, r * 0.44, Math.PI * 1.16, Math.PI * 1.84);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function apologyTexture(size, color) {
+    var c = makeCanvas();
+    var ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    var emojiOk = hasColourEmoji(ctx, SAD);
+    ctx.font = size + 'px Georgia, "Times New Roman", serif';
+    ctx.fillStyle = color;
+    ctx.fillText(APOLOGY, TW / 2, TH / 2 - size * 0.75);
+    if (emojiOk) {
+      ctx.font = size * 1.5 + 'px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+      ctx.fillText(SAD, TW / 2, TH / 2 + size * 0.95);
+    } else {
+      drawSadFace(ctx, TW / 2, TH / 2 + size * 0.95, size * 0.62, color);
+    }
+    return toTexture(c);
+  }
+
   function Note(props) {
     var step = props.step, reduced = props.reduced;
     var group = useRef();
@@ -4074,6 +4136,7 @@ three/build/three.module.js:
     var texts = useMemo(function () {
       var out = PANELS.map(function (t) { return textTexture(t, 58, '#26241f'); });
       out.push(textTexture(FINAL, 46, '#4b463d'));
+      out.push(apologyTexture(54, '#26241f'));
       return out;
     }, []);
 
